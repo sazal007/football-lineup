@@ -1,0 +1,248 @@
+src/
+├── components/                 # Reusable UI components
+│   ├── common/                 # Basic UI elements
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   ├── Switch.tsx
+│   │   └── Modal.tsx           # New reusable modal component
+│   ├── pitch/                  # Pitch-related components
+│   │   ├── PlayerCircle.tsx
+│   │   ├── PitchMarkings.tsx   # New component for field lines/markings
+│   │   ├── PlayerBadge.tsx     # New component for captain/MOTM badges
+│   │   └── index.ts            # Export all pitch components
+│   └── index.ts                # Export all components
+├── features/
+│   ├── lineup/                 # Lineup builder feature
+│   │   ├── components/         # Feature-specific components
+│   │   │   ├── FormationSelector.tsx
+│   │   │   ├── PlayerCountSelector.tsx
+│   │   │   ├── DisplayOptions.tsx
+│   │   │   ├── LineupSettings.tsx
+│   │   │   └── LineupBuilder.tsx
+│   │   ├── hooks/              # Custom hooks for lineup feature
+│   │   │   ├── useFormation.ts
+│   │   │   └── useLineupSettings.ts
+│   │   └── index.ts
+│   ├── player-search/          # Player search feature
+│   │   ├── components/
+│   │   │   ├── PlayerSearch.tsx
+│   │   │   ├── PlayerSearchResults.tsx
+│   │   │   └── PlayerDetails.tsx
+│   │   ├── hooks/
+│   │   │   └── usePlayerSearch.ts
+│   │   ├── api/
+│   │   │   └── playerApi.ts
+│   │   └── index.ts
+│   └── pitch/                  # Football pitch feature
+│       ├── components/
+│       │   ├── FootballPitch.tsx
+│       │   ├── PlayerPosition.tsx
+│       │   └── PitchHeader.tsx
+│       ├── hooks/
+│       │   ├── useDragAndDrop.ts
+│       │   └── usePlayerPositions.ts
+│       └── index.ts
+├── data/                       # Data and constants
+│   └── formations.ts
+├── utils/                      # Utility functions and types
+│   ├── types/
+│   │   ├── formation.types.ts
+│   │   ├── player.types.ts
+│   │   └── index.ts
+│   ├── helpers/
+│   │   └── debounce.ts
+│   └── index.ts
+└── App.tsx
+
+
+## Component Breakdown Plan
+Let's break down the large components into smaller, more focused ones:
+
+### 1. Breaking Down FootballPitch.tsx
+Current Issues:
+
+- Handles too many responsibilities (rendering, search, modal, drag-and-drop)
+- 473 lines of code makes it difficult to maintain
+Proposed Components:
+
+1. FootballPitch.tsx (Parent container)
+   
+   - Manages the overall layout
+   - Coordinates between child components
+   - Handles state that needs to be shared between components
+2. PitchMarkings.tsx
+   
+   - Renders the pitch background, lines, and markings
+   - Pure presentational component
+3. PlayerPosition.tsx
+   
+   - Renders a single player position with PlayerCircle
+   - Handles click to open modal for that position
+   - Manages captain/MOTM badges for the position
+4. PitchHeader.tsx
+   
+   - Renders the formation name, squad title, and subtitle
+5. PlayerSearch.tsx (Move to player-search feature)
+   
+   - Handles the search input and API calls
+   - Uses custom hook usePlayerSearch
+6. PlayerSearchResults.tsx (Move to player-search feature)
+   
+   - Renders the search results
+   - Handles selecting a player from results
+7. PlayerDetails.tsx (Move to player-search feature)
+   
+   - Displays selected player details
+   - Provides option to clear player data
+8. Custom Hooks:
+   
+   - useDragAndDrop.ts - Handles all drag and drop logic
+   - usePlayerPositions.ts - Manages player positions state
+   
+### 2. Breaking Down LineupBuilder.tsx
+Current Issues:
+
+- Handles all lineup settings in one component
+- 233 lines of code
+Proposed Components:
+
+1. LineupBuilder.tsx (Parent container)
+   
+   - Coordinates between child components
+   - Maintains shared state
+2. FormationSelector.tsx
+   
+   - Handles formation selection UI and logic
+3. PlayerCountSelector.tsx
+   
+   - Manages player count selection (5, 7, 11)
+4. DisplayOptions.tsx
+   
+   - Contains all the display toggles (formation, club badge, etc.)
+5. LineupSettings.tsx
+   
+   - Manages squad title, subtitle inputs
+   - Handles team captain and MOTM selection
+6. Custom Hooks:
+   
+   - useFormation.ts - Manages formation state and selection
+   - useLineupSettings.ts - Handles lineup settings state
+
+
+## Implementation Strategy
+recommend implementing this restructuring in phases:
+
+### Phase 1: Extract Utility Functions and Types
+1. Organize types into separate files
+2. Create utility functions for repeated logic (like debounce)
+### Phase 2: Create Custom Hooks
+1. Extract stateful logic into custom hooks
+2. Test hooks independently
+### Phase 3: Break Down Large Components
+1. Start with the most complex component (FootballPitch)
+2. Create new smaller components
+3. Ensure they work together properly
+### Phase 4: Reorganize Directory Structure
+1. Move components to their appropriate locations
+2. Update imports throughout the codebase
+
+
+// src/features/pitch/components/FootballPitch.tsx
+import { useState } from 'react';
+import PitchMarkings from './PitchMarkings';
+import PlayerPosition from './PlayerPosition';
+import PitchHeader from './PitchHeader';
+import PlayerModal from '../../player-search/components/PlayerModal';
+import { usePlayerPositions } from '../hooks/usePlayerPositions';
+import { useDragAndDrop } from '../hooks/useDragAndDrop';
+import { FootballPitchProps } from '../../../utils/types';
+
+export default function FootballPitch({
+  formation,
+  positions,
+  showFormation,
+  flipPlayers,
+  squadTitle,
+  subtitle,
+  showClubBadge,
+  showManager,
+  teamCaptain,
+  manOfTheMatch,
+  onPositionsChange,
+}: FootballPitchProps) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedPlayerIndex, setSelectedPlayerIndex] = useState<number | null>(null);
+  
+  const { playerPositions, updatePlayerPosition, updatePlayerData, clearPlayerData } = 
+    usePlayerPositions(positions, flipPlayers, onPositionsChange);
+  
+  const { pitchRef, handleDragStart, handleDragOver, handleDrop } = 
+    useDragAndDrop(updatePlayerPosition);
+
+  const handleOpenModal = (index: number) => {
+    setSelectedPlayerIndex(index);
+    setModalOpen(true);
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <div 
+        ref={pitchRef}
+        className="relative w-full h-full" 
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Pitch Header */}
+        <PitchHeader 
+          formation={formation} 
+          showFormation={showFormation}
+          squadTitle={squadTitle}
+          subtitle={subtitle}
+        />
+        
+        {/* Pitch Markings */}
+        <PitchMarkings />
+        
+        {/* Player Positions */}
+        {playerPositions.map((position, index) => (
+          <PlayerPosition
+            key={index}
+            position={position}
+            index={index}
+            isTeamCaptain={teamCaptain === `Player ${index + 1}`}
+            isMotm={manOfTheMatch === `Player ${index + 1}`}
+            onDragStart={(e) => handleDragStart(e, index)}
+            onClick={() => handleOpenModal(index)}
+          />
+        ))}
+        
+        {/* Club Badge and Manager */}
+        {/* ... */}
+      </div>
+
+      {/* Player Modal */}
+      {modalOpen && selectedPlayerIndex !== null && (
+        <PlayerModal
+          playerPosition={playerPositions[selectedPlayerIndex]}
+          onClose={() => setModalOpen(false)}
+          onUpdatePlayer={(playerData) => {
+            updatePlayerData(selectedPlayerIndex, playerData);
+            setModalOpen(false);
+          }}
+          onClearPlayer={() => {
+            clearPlayerData(selectedPlayerIndex);
+            setModalOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+## Benefits of This Approach
+1. Improved Maintainability : Smaller components are easier to understand and modify
+2. Better Code Organization : Clear separation of concerns
+3. Enhanced Reusability : Components can be reused in different contexts
+4. Easier Testing : Smaller, focused components are easier to test
+5. Improved Developer Experience : Easier onboarding for new developers
+6. Better Performance : Potential for more optimized rendering
