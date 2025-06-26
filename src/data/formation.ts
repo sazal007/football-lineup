@@ -1,4 +1,5 @@
-import { Formation, PlayerCount } from "../utils/type";
+import { Formation, PlayerCount } from "../utils/types";
+
 
 export const FORMATIONS: Record<PlayerCount, Formation[]> = {
   5: [
